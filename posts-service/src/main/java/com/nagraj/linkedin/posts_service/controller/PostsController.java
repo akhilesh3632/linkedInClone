@@ -1,9 +1,8 @@
 package com.nagraj.linkedin.posts_service.controller;
-
 import com.nagraj.linkedin.posts_service.dto.PostCreateRequestDto;
 import com.nagraj.linkedin.posts_service.dto.PostDto;
 import com.nagraj.linkedin.posts_service.service.PostsService;
-import jakarta.servlet.http.HttpServletRequest;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,14 +17,14 @@ public class PostsController {
     private final PostsService postsService;
 
     @PostMapping
-    public ResponseEntity<PostDto> createPost(@RequestBody PostCreateRequestDto postCreateRequestDto, HttpServletRequest httpServletRequest){
-        PostDto createdPost = postsService.createPost(postCreateRequestDto,1L);
+    public ResponseEntity<PostDto> createPost(@RequestBody PostCreateRequestDto postCreateRequestDto){
+        PostDto createdPost = postsService.createPost(postCreateRequestDto);
         return new ResponseEntity<>(createdPost, HttpStatus.CREATED);
     }
 
     @GetMapping("/{postId}")
-    public ResponseEntity<PostDto> getPostById(@PathVariable Long postId, HttpServletRequest httpServletRequest){
-        String userId = httpServletRequest.getHeader("X-User-Id");
+    public ResponseEntity<PostDto> getPostById(@PathVariable Long postId){
+
         PostDto PostDto = postsService.getPostById(postId);
         return ResponseEntity.ok(PostDto);
     }

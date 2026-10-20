@@ -1,0 +1,46 @@
+
+package com.nagraj.linkedin.connections_service.auth;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+@Component
+public class UserInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler) {
+
+        String userId = request.getHeader("X-User-Id");
+
+        if (userId != null && !userId.isBlank()) {
+            try {
+                UserContextHolder.setCurrentUserId(
+                        Long.valueOf(userId)
+                );
+            } catch (NumberFormatException ex) {
+                response.setStatus(
+                        HttpServletResponse.SC_BAD_REQUEST
+                );
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    public void afterCompletion(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler,
+            @Nullable Exception ex) {
+
+        UserContextHolder.clear();
+    }
+}
