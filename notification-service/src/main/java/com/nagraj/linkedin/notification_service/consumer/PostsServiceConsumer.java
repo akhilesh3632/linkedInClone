@@ -22,7 +22,8 @@ public class PostsServiceConsumer {
     private final ConnectionsClient connectionsClient;
     private final SendNotification sendNotification;
 
-    @KafkaListener(topics = "post-created-topic")
+    @KafkaListener(topics = "post-created-topic",
+    properties = "spring.json.value.default.type=com.nagraj.linkedin.posts_service.event.PostCreatedEvent")
     public void handlePostCreated(PostCreatedEvent postCreatedEvent){
         log.info("Sending notifications: handlePostCreated {}",postCreatedEvent);
         List<PersonDto> connections = connectionsClient.getFirstConnections(postCreatedEvent.getCreatorId());
@@ -34,7 +35,8 @@ public class PostsServiceConsumer {
 
 
     }
-    @KafkaListener(topics = "post-liked-topic")
+    @KafkaListener(topics = "post-liked-topic",
+            properties = "spring.json.value.default.type=com.nagraj.linkedin.posts_service.event.PostLikedEvent")
     public void handlePostLiked(PostLikedEvent postLikedEvent){
         log.info("Sending notification: handlePostLiked {}",postLikedEvent);
         String message = String.format("Your post, %d has been liked by %d",postLikedEvent.getPostId(),

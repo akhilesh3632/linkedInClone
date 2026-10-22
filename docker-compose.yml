@@ -13,7 +13,7 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/lampu@3632
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD}
       NEO4J_initial_dbms_default__database: LinkedInDB
     volumes:
       - neo4j_data:/data
@@ -25,7 +25,6 @@ services:
     ports:
       - "9092:9092"
       - "9094:9094"
-
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -40,7 +39,6 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 3
-
     volumes:
       - kafka_data:/var/lib/kafka/data
 
@@ -54,7 +52,130 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       - kafka
+
+  user-db:
+    image: postgres:16
+    container_name: user-db
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+
+  posts-db:
+    image: postgres:16
+    container_name: posts-db
+    environment:
+      POSTGRES_DB: postdb
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - posts_db_data:/var/lib/postgresql/data
+
+  notification-db:
+    image: postgres:16
+    container_name: notification-db
+    environment:
+      POSTGRES_DB: notificationdb
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+
+  discovery-server:
+    build: ./discovery-server
+    image: discovery-server:latest
+    ports:
+      - "8761:8761"
+
+  user-service:
+    build: ./user-service
+    image: user-service:latest
+    ports:
+      - "9020:9020"
+    depends_on:
+      - discovery-server
+      - user-db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/userdb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+
+  posts-service:
+    build: ./posts-service
+    image: posts-service:latest
+    ports:
+      - "9010:9010"
+    depends_on:
+      - discovery-server
+      - posts-db
+      - redis
+      - kafka
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://posts-db:5432/postdb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+
+  connections-service:
+    build: ./connections-service
+    image: connections-service:latest
+    ports:
+      - "9030:9030"
+    depends_on:
+      - discovery-server
+      - neo4j
+      - kafka
+    environment:
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: ${NEO4J_USER:-neo4j}
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+
+  notification-service:
+    build: ./notification-service
+    image: notification-service:latest
+    ports:
+      - "9040:9040"
+    depends_on:
+      - discovery-server
+      - notification-db
+      - kafka
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://notification-db:5432/notificationdb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+
+  api-gateway:
+    build: ./api-gateway
+    image: api-gateway:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - discovery-server
+      - user-service
+      - posts-service
+      - connections-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+
 volumes:
   neo4j_data:
   neo4j_logs:
   kafka_data:
+  user_db_data:
+  posts_db_data:
+  notification_db_data:
